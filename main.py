@@ -58,6 +58,7 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     # TODO: Implement function with skip layers.
+    print(vgg_layer7_out.get_shape())
     conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1))
     conf_decoder_layer1 = tf.layers.conv2d_transpose(conv_1x1, num_classes, (2, 2), (2, 2))
     conf_decoder_layer2 = tf.layers.conv2d_transpose(conf_decoder_layer1, num_classes, (2, 2), (2, 2))
@@ -141,14 +142,20 @@ def run():
         correct_label = tf.placeholder(tf.float32)
         # TODO: Build NN using load_vgg, layers, and optimize function
         image_input, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
+        test_img, labels = next(get_batches_fn(1))
+
+        res = sess.run(vgg_layer7_out, feed_dict={image_input: test_img, keep_prob: 1.0})
+        
+        print("image" + str(vgg_layer7_out.get_shape()))
+        print("res" + str(res.shape))
         output = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes) 
-        nn_last_layer, train_op, cross_entropy_loss = optimize(output, correct_label, learning_rate, num_classes)
+        #nn_last_layer, train_op, cross_entropy_loss = optimize(output, correct_label, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
-        train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
-             correct_label, keep_prob, learning_rate)
+        #train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
+        #     correct_label, keep_prob, learning_rate)
         # TODO: Save inference data using helper.save_inference_samples
-        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        #helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
         # OPTIONAL: Apply the trained model to a video
 
