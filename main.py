@@ -36,17 +36,20 @@ def load_vgg(sess, vgg_path):
     
     image_input = sess.graph.get_tensor_by_name(vgg_input_tensor_name)
     keep_prob = sess.graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
+    
+    #shape(1, 20, 72, 256)
     layer3_out = sess.graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
+    
+    #shape(1, 10, 36, 512)
     layer4_out = sess.graph.get_tensor_by_name(vgg_layer4_out_tensor_name)
+    
+    #shape(1, 5, 18, 4096)
     layer7_out = sess.graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
     
     return image_input, keep_prob, layer3_out, layer4_out, layer7_out
     
 tests.test_load_vgg(load_vgg, tf)
 
-# custom init with the seed set to 0 by default
-def custom_init(shape, dtype=tf.float32, partition_info=None, seed=0):
-    return tf.random_normal(shape, dtype=dtype, seed=seed)
 
 def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
@@ -57,20 +60,26 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
-    # TODO: Implement function with skip layers.
-    print(vgg_layer7_out.get_shape())
-    conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1))
-    conf_decoder_layer1 = tf.layers.conv2d_transpose(conv_1x1, num_classes, (2, 2), (2, 2))
-    conf_decoder_layer2 = tf.layers.conv2d_transpose(conf_decoder_layer1, num_classes, (2, 2), (2, 2))
-    conf_decoder_layer3 = tf.layers.conv2d_transpose(conf_decoder_layer2, num_classes, (2, 2), (2, 2))
-    conf_decoder_layer4 = tf.layers.conv2d_transpose(conf_decoder_layer3, num_classes, (2, 2), (2, 2))
-    conf_decoder_layer5 = tf.layers.conv2d_transpose(conf_decoder_layer4, num_classes, (2, 2), (2, 2))
-    conf_decoder_layer6 = tf.layers.conv2d_transpose(conf_decoder_layer5, num_classes, (2, 2), (2, 2))
-    conf_decoder_layer7 = tf.layers.conv2d_transpose(conf_decoder_layer6, num_classes, (2, 2), (2, 2))
+    #shape(1, 5, 18, 2)
+    conf_decoder_layer1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1))
     
-    return conf_decoder_layer7
+    #shape(1, 10, 36, 2)
+    conf_decoder_layer2_up = tf.layers.conv2d_transpose(conf_decoder_layer1, num_classes, 2, strides=(2, 2))
+    #Add skip layer 4_out
+    conf_decoder_layer2_skip = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, strides=(1,1))
+    conf_decoder_layer2 = tf.add(conf_decoder_layer2_up, conf_decoder_layer2_skip)
+    
+    #shape(1, 20, 72, 2)
+    conf_decoder_layer3_up = tf.layers.conv2d_transpose(conf_decoder_layer2, num_classes, 2, strides=(2, 2))
+    #Add skip layer 3_out
+    conf_decoder_layer3_skip = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, strides=(1,1))
+    conf_decoder_layer3 = tf.add(conf_decoder_layer3_up, conf_decoder_layer3_skip)
+  
+    #shape(1, 160, 576, 2)
+    output = tf.layers.conv2d_transpose(conf_decoder_layer3, num_classes, 8, strides=(8, 8))
+    
+    return output
 tests.test_layers(layers)
-
 
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     """
@@ -81,15 +90,16 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     :param num_classes: Number of classes to classify
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
-    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=nn_last_layer, labels=correct_label)
+    logits = tf.reshape(nn_last_layer, (-1, num_classes))
+
+    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label)
     cross_entropy_loss = tf.reduce_mean(cross_entropy)
     optimizer = tf.train.AdamOptimizer(learning_rate)
     train_op = optimizer.minimize(cross_entropy_loss)
     
     # TODO: Implement function
-    return nn_last_layer, train_op, cross_entropy_loss
-
-#tests.test_optimize(optimize)
+    return logits, train_op, cross_entropy_loss
+tests.test_optimize(optimize)
 
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
@@ -109,7 +119,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     """
     # TODO: Implement function
     pass
-#tests.test_train_nn(train_nn)
+tests.test_train_nn(train_nn)
 
 
 def run():
@@ -142,13 +152,11 @@ def run():
         correct_label = tf.placeholder(tf.float32)
         # TODO: Build NN using load_vgg, layers, and optimize function
         image_input, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
-        test_img, labels = next(get_batches_fn(1))
+        test_img, correct_label = next(get_batches_fn(1))
 
-        res = sess.run(vgg_layer7_out, feed_dict={image_input: test_img, keep_prob: 1.0})
-        
-        print("image" + str(vgg_layer7_out.get_shape()))
-        print("res" + str(res.shape))
         output = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes) 
+        #res = sess.run(output, feed_dict={image_input: test_img, keep_prob: 1.0})
+    
         #nn_last_layer, train_op, cross_entropy_loss = optimize(output, correct_label, learning_rate, num_classes)
 
         # TODO: Train NN using the train_nn function
