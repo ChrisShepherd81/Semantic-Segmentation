@@ -5,7 +5,7 @@ import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
 from PIL import Image
-import time
+import sys
 
 
 # Check TensorFlow Version
@@ -61,26 +61,32 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
+    initializer = tf.truncated_normal_initializer(stddev = 0.01)
     #shape(1, 5, 18, 2)
     conf_decoder_layer1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), 
-                                           kernel_initializer=tf.truncated_normal_initializer)
-    
+                                           kernel_initializer=initializer)
+    ##########################################################################################################
     #shape(1, 10, 36, 2)
-    conf_decoder_layer2_up = tf.layers.conv2d_transpose(conf_decoder_layer1, num_classes, 2, strides=(2, 2))
+    conf_decoder_layer2_up = tf.layers.conv2d_transpose(conf_decoder_layer1, num_classes, 2, strides=(2, 2), 
+                                                        padding='SAME', kernel_initializer=initializer)
     #Add skip layer 4_out
     conf_decoder_layer2_skip = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, strides=(1,1), 
-                                                kernel_initializer=tf.truncated_normal_initializer)
+                                               kernel_initializer=initializer)
     conf_decoder_layer2 = tf.add(conf_decoder_layer2_up, conf_decoder_layer2_skip)
     
+    ##########################################################################################################
     #shape(1, 20, 72, 2)
-    conf_decoder_layer3_up = tf.layers.conv2d_transpose(conf_decoder_layer2, num_classes, 2, strides=(2, 2))
+    conf_decoder_layer3_up = tf.layers.conv2d_transpose(conf_decoder_layer2, num_classes, 2, strides=(2, 2), 
+                                                        padding='SAME', kernel_initializer=initializer)
     #Add skip layer 3_out
     conf_decoder_layer3_skip = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, strides=(1,1), 
-                                                kernel_initializer=tf.truncated_normal_initializer)
+                                                kernel_initializer=initializer)
     conf_decoder_layer3 = tf.add(conf_decoder_layer3_up, conf_decoder_layer3_skip)
+    ##########################################################################################################
   
     #shape(1, 160, 576, 2)
-    output = tf.layers.conv2d_transpose(conf_decoder_layer3, num_classes, 8, strides=(8, 8))
+    output = tf.layers.conv2d_transpose(conf_decoder_layer3, num_classes, 8, strides=(8, 8), 
+                                        padding='SAME', kernel_initializer=initializer)
     
     return output
 #tests.test_layers(layers)
@@ -124,14 +130,11 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     """
     # TODO: Implement function
     for i in range(epochs):
-        print("Epoch " + str(i))
-        j = 0
+        sys.stdout.write("\nEpoch " + str(i+1) + " running ")
         for batch_img, batch_label in (get_batches_fn(batch_size)):  
-            print("Batch " + str(j))
-            
-            j += 1
-            sess.run(train_op, feed_dict={input_image: batch_img, correct_label: batch_label, keep_prob: 0.5, learning_rate: 0.001})
-
+            #sys.stdout.write('.')
+            test, loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: batch_img, correct_label: batch_label, keep_prob: 0.8, learning_rate: 0.001})
+            print(loss)
 #tests.test_train_nn(train_nn)
 
 
@@ -141,7 +144,7 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
-    epochs = 1
+    epochs = 15
     batch_size = 8 #No bigger batch size possible on GTX 1060
 
     # Download pretrained vgg model
@@ -172,7 +175,7 @@ def run():
     
         sess.run(tf.global_variables_initializer())
     
-        # TODO: Train NN using the train_nn function
+        #Train NN using the train_nn function
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
              correct_label, keep_prob, learning_rate)
         
