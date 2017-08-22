@@ -105,6 +105,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label)
     cross_entropy_loss = tf.reduce_mean(cross_entropy)
+    tf.summary.scalar("cross_entropy_loss", cross_entropy_loss)
     
     optimizer = tf.train.AdamOptimizer(learning_rate)
     train_op = optimizer.minimize(cross_entropy_loss)
@@ -129,12 +130,17 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
+    train_writer = tf.summary.FileWriter('./log', sess.graph)
+        
     for i in range(epochs):
         sys.stdout.write("\nEpoch " + str(i+1) + " running ")
+        j = 0
         for batch_img, batch_label in (get_batches_fn(batch_size)):  
-            #sys.stdout.write('.')
-            test, loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: batch_img, correct_label: batch_label, keep_prob: 0.8, learning_rate: 0.001})
+            j += 1
+            merged = tf.summary.merge_all()
+            summary, _, loss = sess.run([merged, train_op, cross_entropy_loss], feed_dict={input_image: batch_img, correct_label: batch_label, keep_prob: 0.8, learning_rate: 0.001})
             print(loss)
+            train_writer.add_summary(summary, j)
 #tests.test_train_nn(train_nn)
 
 
@@ -144,7 +150,7 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
-    epochs = 15
+    epochs = 3
     batch_size = 8 #No bigger batch size possible on GTX 1060
 
     # Download pretrained vgg model
