@@ -18,7 +18,7 @@ if not tf.test.gpu_device_name():
 else:
     print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
 
-
+######################################################################################################################
 def load_vgg(sess, vgg_path):
     """
     Load Pretrained VGG Model into TensorFlow.
@@ -48,9 +48,9 @@ def load_vgg(sess, vgg_path):
     #shape(1, 5, 18, 4096)
     layer7_out = sess.graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
     
-    return image_input, keep_prob, layer3_out, layer4_out, layer7_out
-    
+    return image_input, keep_prob, layer3_out, layer4_out, layer7_out  
 #tests.test_load_vgg(load_vgg, tf)
+######################################################################################################################
 
 def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
@@ -83,13 +83,21 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
                                                 kernel_initializer=initializer)
     conf_decoder_layer3 = tf.add(conf_decoder_layer3_up, conf_decoder_layer3_skip)
     ##########################################################################################################
-  
-    #shape(1, 160, 576, 2)
-    output = tf.layers.conv2d_transpose(conf_decoder_layer3, num_classes, 8, strides=(8, 8), 
+    #shape(1, 40, 144, 2)
+    conf_decoder_layer4 = tf.layers.conv2d_transpose(conf_decoder_layer3, num_classes, 2, strides=(2, 2), 
                                         padding='SAME', kernel_initializer=initializer)
-    
-    return output
+    ##########################################################################################################
+    #shape(1, 80, 288, 2)
+    conf_decoder_layer5 = tf.layers.conv2d_transpose(conf_decoder_layer4, num_classes, 2, strides=(2, 2), 
+                                        padding='SAME', kernel_initializer=initializer)
+    ##########################################################################################################
+    #shape(1, 160, 576, 2)
+    output_layer = tf.layers.conv2d_transpose(conf_decoder_layer5, num_classes, 2, strides=(2, 2), 
+                                        padding='SAME', kernel_initializer=initializer)
+    ##########################################################################################################
+    return output_layer
 #tests.test_layers(layers)
+######################################################################################################################
 
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     """
@@ -112,7 +120,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     
     return logits, train_op, cross_entropy_loss
 #tests.test_optimize(optimize)
-
+######################################################################################################################
 
 def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
              correct_label, keep_prob, learning_rate):
@@ -137,12 +145,14 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
         j = 0
         for batch_img, batch_label in (get_batches_fn(batch_size)):  
             j += 1
-            merged = tf.summary.merge_all()
-            summary, _, loss = sess.run([merged, train_op, cross_entropy_loss], feed_dict={input_image: batch_img, correct_label: batch_label, keep_prob: 0.8, learning_rate: 0.001})
+            merge_op = tf.summary.merge_all()
+            summary, _, loss = sess.run([merge_op, train_op, cross_entropy_loss], feed_dict={input_image: batch_img, correct_label: batch_label, keep_prob: 0.8, learning_rate: 0.001})
             print(loss)
             train_writer.add_summary(summary, j)
+    
+    train_writer.close()
 #tests.test_train_nn(train_nn)
-
+######################################################################################################################
 
 def run():
     num_classes = 2
@@ -153,10 +163,10 @@ def run():
     epochs = 3
     batch_size = 8 #No bigger batch size possible on GTX 1060
 
-    # Download pretrained vgg model
+    # Download pre-trained VGG model
     helper.maybe_download_pretrained_vgg(data_dir)
     
-    # Path to vgg model
+    # Path to VGG model
     vgg_path = os.path.join(data_dir, 'vgg')
 
     # OPTIONAL: Train and Inference on the cityscapes dataset instead of the Kitti dataset.
@@ -189,6 +199,7 @@ def run():
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
         # OPTIONAL: Apply the trained model to a video
+######################################################################################################################
 
 if __name__ == '__main__':
     run()
