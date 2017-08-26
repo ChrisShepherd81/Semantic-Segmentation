@@ -3,10 +3,7 @@ import tensorflow as tf
 import helper
 import warnings
 from distutils.version import LooseVersion
-import project_tests as tests
-from PIL import Image
-import sys
-
+import time
 
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
@@ -62,38 +59,44 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :return: The Tensor for the last layer of output
     """
     initializer = tf.truncated_normal_initializer(stddev = 0.01)
-    #shape(1, 5, 18, 2)
-    conf_decoder_layer1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), 
-                                           kernel_initializer=initializer)
-    ##########################################################################################################
-    #shape(1, 10, 36, 2)
-    conf_decoder_layer2_up = tf.layers.conv2d_transpose(conf_decoder_layer1, num_classes, 2, strides=(2, 2), 
-                                                        padding='SAME', kernel_initializer=initializer)
-    #Add skip layer 4_out
-    conf_decoder_layer2_skip = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, strides=(1,1), 
+    with tf.name_scope("conf_decoder_layer1"):
+        #shape(1, 5, 18, 2)
+        conf_decoder_layer1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), 
                                                kernel_initializer=initializer)
-    conf_decoder_layer2 = tf.add(conf_decoder_layer2_up, conf_decoder_layer2_skip)
+    ##########################################################################################################
+    with tf.name_scope("conf_decoder_layer2"):
+        #shape(1, 10, 36, 2)
+        conf_decoder_layer2_up = tf.layers.conv2d_transpose(conf_decoder_layer1, num_classes, 2, strides=(2, 2), 
+                                                            padding='SAME', kernel_initializer=initializer)
+        #Add skip layer 4_out
+        conf_decoder_layer2_skip = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, strides=(1,1), 
+                                                   kernel_initializer=initializer)
+        conf_decoder_layer2 = tf.add(conf_decoder_layer2_up, conf_decoder_layer2_skip)
     
     ##########################################################################################################
-    #shape(1, 20, 72, 2)
-    conf_decoder_layer3_up = tf.layers.conv2d_transpose(conf_decoder_layer2, num_classes, 2, strides=(2, 2), 
-                                                        padding='SAME', kernel_initializer=initializer)
-    #Add skip layer 3_out
-    conf_decoder_layer3_skip = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, strides=(1,1), 
-                                                kernel_initializer=initializer)
-    conf_decoder_layer3 = tf.add(conf_decoder_layer3_up, conf_decoder_layer3_skip)
+    with tf.name_scope("conf_decoder_layer3"):
+        #shape(1, 20, 72, 2)
+        conf_decoder_layer3_up = tf.layers.conv2d_transpose(conf_decoder_layer2, num_classes, 2, strides=(2, 2), 
+                                                            padding='SAME', kernel_initializer=initializer)
+        #Add skip layer 3_out
+        conf_decoder_layer3_skip = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, strides=(1,1), 
+                                                    kernel_initializer=initializer)
+        conf_decoder_layer3 = tf.add(conf_decoder_layer3_up, conf_decoder_layer3_skip)
     ##########################################################################################################
-    #shape(1, 40, 144, 2)
-    conf_decoder_layer4 = tf.layers.conv2d_transpose(conf_decoder_layer3, num_classes, 2, strides=(2, 2), 
-                                        padding='SAME', kernel_initializer=initializer)
+    with tf.name_scope("conf_decoder_layer4"):
+        #shape(1, 40, 144, 2)
+        conf_decoder_layer4 = tf.layers.conv2d_transpose(conf_decoder_layer3, num_classes, 2, strides=(2, 2), 
+                                            padding='SAME', kernel_initializer=initializer)
     ##########################################################################################################
-    #shape(1, 80, 288, 2)
-    conf_decoder_layer5 = tf.layers.conv2d_transpose(conf_decoder_layer4, num_classes, 2, strides=(2, 2), 
-                                        padding='SAME', kernel_initializer=initializer)
+    with tf.name_scope("conf_decoder_layer5"):
+        #shape(1, 80, 288, 2)
+        conf_decoder_layer5 = tf.layers.conv2d_transpose(conf_decoder_layer4, num_classes, 2, strides=(2, 2), 
+                                            padding='SAME', kernel_initializer=initializer)
     ##########################################################################################################
-    #shape(1, 160, 576, 2)
-    output_layer = tf.layers.conv2d_transpose(conf_decoder_layer5, num_classes, 2, strides=(2, 2), 
-                                        padding='SAME', kernel_initializer=initializer)
+    with tf.name_scope("conf_output_layer"):
+        #shape(1, 160, 576, 2)
+        output_layer = tf.layers.conv2d_transpose(conf_decoder_layer5, num_classes, 2, strides=(2, 2), 
+                                            padding='SAME', kernel_initializer=initializer)
     ##########################################################################################################
     return output_layer
 #tests.test_layers(layers)
@@ -112,6 +115,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     correct_label = tf.reshape(correct_label, (-1, num_classes))
     
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label)
+    
     cross_entropy_loss = tf.reduce_mean(cross_entropy)
     tf.summary.scalar("cross_entropy_loss", cross_entropy_loss)
     
@@ -137,19 +141,26 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param keep_prob: TF Placeholder for dropout keep probability
     :param learning_rate: TF Placeholder for learning rate
     """
-    # TODO: Implement function
-    train_writer = tf.summary.FileWriter('./log', sess.graph)
-        
+    train_writer = tf.summary.FileWriter('./log/' + str(time.time()), sess.graph)
+    tf.summary.scalar("batch_size", batch_size)
+    tf.summary.scalar("learning_rate", learning_rate)
+    tf.summary.scalar("keep_prob", keep_prob)
+    tf.summary.scalar("epochs", epochs)
+    overall_cnt = 0
     for i in range(epochs):
-        sys.stdout.write("\nEpoch " + str(i+1) + " running ")
-        j = 0
-        for batch_img, batch_label in (get_batches_fn(batch_size)):  
-            j += 1
+        print("Epoch " + str(i+1) + " running ...")
+        epoch_loss = 0;
+        batch_cnt = 0;
+        for batch_img, batch_label in (get_batches_fn(batch_size)):             
             merge_op = tf.summary.merge_all()
             summary, _, loss = sess.run([merge_op, train_op, cross_entropy_loss], feed_dict={input_image: batch_img, correct_label: batch_label, keep_prob: 0.8, learning_rate: 0.001})
-            print(loss)
-            train_writer.add_summary(summary, j)
-    
+            train_writer.add_summary(summary, overall_cnt)
+            epoch_loss += loss
+            overall_cnt += 1
+            batch_cnt += 1
+        
+        print("Epoch Loss: " + str(epoch_loss/batch_cnt))
+        
     train_writer.close()
 #tests.test_train_nn(train_nn)
 ######################################################################################################################
@@ -159,9 +170,9 @@ def run():
     image_shape = (160, 576)
     data_dir = './data'
     runs_dir = './runs'
-    tests.test_for_kitti_dataset(data_dir)
-    epochs = 3
-    batch_size = 8 #No bigger batch size possible on GTX 1060
+    #tests.test_for_kitti_dataset(data_dir)
+    epochs = 15
+    batch_size = 10 #Maximum of 10. No bigger batch size possible on GTX 1060
 
     # Download pre-trained VGG model
     helper.maybe_download_pretrained_vgg(data_dir)
@@ -187,7 +198,9 @@ def run():
         # Build NN using load_vgg, layers, and optimize function
         input_image, keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
         output = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes) 
+        
         logits, train_op, cross_entropy_loss = optimize(output, correct_label, learning_rate, num_classes)
+        #logits, train_op, cross_entropy_loss = optimize_iou(output, correct_label, learning_rate, num_classes)
     
         sess.run(tf.global_variables_initializer())
     
@@ -203,3 +216,4 @@ def run():
 
 if __name__ == '__main__':
     run()
+    print("Exit program")
