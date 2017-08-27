@@ -58,7 +58,8 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
-    initializer = tf.truncated_normal_initializer(stddev = 0.01)
+    initializer = tf.truncated_normal_initializer(stddev = 0.01) # 0.001, _0.01_
+    ##########################################################################################################
     with tf.name_scope("conf_decoder_layer1"):
         #shape(1, 5, 18, 2)
         conf_decoder_layer1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), 
@@ -113,7 +114,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     """
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
     correct_label = tf.reshape(correct_label, (-1, num_classes))
-    
+   
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label)
     
     cross_entropy_loss = tf.reduce_mean(cross_entropy)
@@ -121,6 +122,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     
     optimizer = tf.train.AdamOptimizer(learning_rate)
     train_op = optimizer.minimize(cross_entropy_loss)
+    
     
     return logits, train_op, cross_entropy_loss
 #tests.test_optimize(optimize)
@@ -141,11 +143,15 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param keep_prob: TF Placeholder for dropout keep probability
     :param learning_rate: TF Placeholder for learning rate
     """
+    kp = 0.7 #keep_prob: 0.5, 0.6, _0.7_, 0.9
+    lr = 0.001 #learning_rate: 0.0001, _0.001_, 0.01
+    
     train_writer = tf.summary.FileWriter('./log/' + str(time.time()), sess.graph)
     tf.summary.scalar("batch_size", batch_size)
     tf.summary.scalar("learning_rate", learning_rate)
     tf.summary.scalar("keep_prob", keep_prob)
     tf.summary.scalar("epochs", epochs)
+       
     overall_cnt = 0
     for i in range(epochs):
         print("Epoch " + str(i+1) + " running ...")
@@ -153,7 +159,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
         batch_cnt = 0;
         for batch_img, batch_label in (get_batches_fn(batch_size)):             
             merge_op = tf.summary.merge_all()
-            summary, _, loss = sess.run([merge_op, train_op, cross_entropy_loss], feed_dict={input_image: batch_img, correct_label: batch_label, keep_prob: 0.8, learning_rate: 0.001})
+            summary, _, loss = sess.run([merge_op, train_op, cross_entropy_loss], feed_dict={input_image: batch_img, correct_label: batch_label, keep_prob: kp, learning_rate: lr})
             train_writer.add_summary(summary, overall_cnt)
             epoch_loss += loss
             overall_cnt += 1
@@ -171,8 +177,9 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     #tests.test_for_kitti_dataset(data_dir)
-    epochs = 15
-    batch_size = 10 #Maximum of 10. No bigger batch size possible on GTX 1060
+    epochs = 10 # _10_, 20, 100
+    #Maximum of 10. No bigger batch size possible on GTX 1060
+    batch_size = 8 # 2, 4, 6, _8_, 10
 
     # Download pre-trained VGG model
     helper.maybe_download_pretrained_vgg(data_dir)
@@ -181,6 +188,7 @@ def run():
     vgg_path = os.path.join(data_dir, 'vgg')
 
     # OPTIONAL: Train and Inference on the cityscapes dataset instead of the Kitti dataset.
+    
     # You'll need a GPU with at least 10 teraFLOPS to train on.
     #  https://www.cityscapes-dataset.com/
 
@@ -200,9 +208,9 @@ def run():
         output = layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes) 
         
         logits, train_op, cross_entropy_loss = optimize(output, correct_label, learning_rate, num_classes)
-        #logits, train_op, cross_entropy_loss = optimize_iou(output, correct_label, learning_rate, num_classes)
     
         sess.run(tf.global_variables_initializer())
+        sess.run(tf.local_variables_initializer())
     
         #Train NN using the train_nn function
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
