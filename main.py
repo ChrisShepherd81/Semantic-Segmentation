@@ -167,7 +167,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param keep_prob: TF Placeholder for dropout keep probability
     :param learning_rate: TF Placeholder for learning rate
     """
-    kp = 0.7 #keep_prob: 0.5, 0.6, _0.7_, 0.9
+    kp = 0.7 #keep_prob: 0.5, 0.6, _0.7_, 0.9, 1.0
     lr = 0.001 #learning_rate: 0.0001, _0.001_, 0.01
     
     train_writer = tf.summary.FileWriter('./log/' + str(time.time()), sess.graph)
@@ -201,7 +201,7 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     #tests.test_for_kitti_dataset(data_dir)
-    epochs = 20 # _10_, 20, 100
+    epochs = 15 # 10, _15_, 20, 100
     #Maximum of 10. No bigger batch size possible on GTX 1060
     batch_size = 8 # 2, 4, 6, _8_, 10
 
