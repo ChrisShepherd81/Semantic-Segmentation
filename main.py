@@ -58,46 +58,70 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
-    initializer = tf.truncated_normal_initializer(stddev = 0.01) # 0.001, _0.01_
+    initializer_stddev = 0.01 # 0.001, _0.01_
+    regularizer_weight = 1e-3
+    up_sampling_kernel = 4 # 2, _4_
+    up_sampling_strides = 2
     ##########################################################################################################
     with tf.name_scope("conf_decoder_layer1"):
         #shape(1, 5, 18, 2)
         conf_decoder_layer1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), 
-                                               kernel_initializer=initializer)
+                                               kernel_initializer=tf.truncated_normal_initializer(stddev = initializer_stddev),
+                                               kernel_regularizer=tf.contrib.layers.l2_regularizer(regularizer_weight),
+                                               padding='SAME')
     ##########################################################################################################
     with tf.name_scope("conf_decoder_layer2"):
         #shape(1, 10, 36, 2)
-        conf_decoder_layer2_up = tf.layers.conv2d_transpose(conf_decoder_layer1, num_classes, 2, strides=(2, 2), 
-                                                            padding='SAME', kernel_initializer=initializer)
+        conf_decoder_layer2_up = tf.layers.conv2d_transpose(conf_decoder_layer1, num_classes, up_sampling_kernel, 
+                                                            strides=up_sampling_strides,                                                            
+                                                            kernel_initializer=tf.truncated_normal_initializer(stddev = initializer_stddev),
+                                                            kernel_regularizer=tf.contrib.layers.l2_regularizer(regularizer_weight),
+                                                            padding='SAME')
         #Add skip layer 4_out
         conf_decoder_layer2_skip = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, strides=(1,1), 
-                                                   kernel_initializer=initializer)
+                                                    kernel_initializer=tf.truncated_normal_initializer(stddev = initializer_stddev),
+                                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(regularizer_weight),
+                                                    padding='same')
         conf_decoder_layer2 = tf.add(conf_decoder_layer2_up, conf_decoder_layer2_skip)
     
     ##########################################################################################################
     with tf.name_scope("conf_decoder_layer3"):
         #shape(1, 20, 72, 2)
-        conf_decoder_layer3_up = tf.layers.conv2d_transpose(conf_decoder_layer2, num_classes, 2, strides=(2, 2), 
-                                                            padding='SAME', kernel_initializer=initializer)
+        conf_decoder_layer3_up = tf.layers.conv2d_transpose(conf_decoder_layer2, num_classes, up_sampling_kernel, 
+                                                            strides=up_sampling_strides,
+                                                            kernel_initializer=tf.truncated_normal_initializer(stddev = initializer_stddev), 
+                                                            kernel_regularizer=tf.contrib.layers.l2_regularizer(regularizer_weight),
+                                                            padding='SAME')
         #Add skip layer 3_out
         conf_decoder_layer3_skip = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, strides=(1,1), 
-                                                    kernel_initializer=initializer)
+                                                    kernel_initializer=tf.truncated_normal_initializer(stddev = initializer_stddev),
+                                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(regularizer_weight),
+                                                    padding='SAME')
         conf_decoder_layer3 = tf.add(conf_decoder_layer3_up, conf_decoder_layer3_skip)
     ##########################################################################################################
     with tf.name_scope("conf_decoder_layer4"):
         #shape(1, 40, 144, 2)
-        conf_decoder_layer4 = tf.layers.conv2d_transpose(conf_decoder_layer3, num_classes, 2, strides=(2, 2), 
-                                            padding='SAME', kernel_initializer=initializer)
+        conf_decoder_layer4 = tf.layers.conv2d_transpose(conf_decoder_layer3, num_classes, up_sampling_kernel,
+                                                         strides=up_sampling_strides,
+                                                         kernel_initializer=tf.truncated_normal_initializer(stddev = initializer_stddev),
+                                                         kernel_regularizer=tf.contrib.layers.l2_regularizer(regularizer_weight),
+                                                         padding='SAME')
     ##########################################################################################################
     with tf.name_scope("conf_decoder_layer5"):
         #shape(1, 80, 288, 2)
-        conf_decoder_layer5 = tf.layers.conv2d_transpose(conf_decoder_layer4, num_classes, 2, strides=(2, 2), 
-                                            padding='SAME', kernel_initializer=initializer)
+        conf_decoder_layer5 = tf.layers.conv2d_transpose(conf_decoder_layer4, num_classes, up_sampling_kernel, 
+                                                         strides=up_sampling_strides,
+                                                         kernel_initializer=tf.truncated_normal_initializer(stddev = initializer_stddev),
+                                                         kernel_regularizer=tf.contrib.layers.l2_regularizer(regularizer_weight),
+                                                         padding='SAME')
     ##########################################################################################################
     with tf.name_scope("conf_output_layer"):
         #shape(1, 160, 576, 2)
-        output_layer = tf.layers.conv2d_transpose(conf_decoder_layer5, num_classes, 2, strides=(2, 2), 
-                                            padding='SAME', kernel_initializer=initializer)
+        output_layer = tf.layers.conv2d_transpose(conf_decoder_layer5, num_classes, up_sampling_kernel, 
+                                                  strides=up_sampling_strides,                                            
+                                                  kernel_initializer=tf.truncated_normal_initializer(stddev = initializer_stddev),
+                                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(regularizer_weight),
+                                                  padding='SAME')
     ##########################################################################################################
     return output_layer
 #tests.test_layers(layers)
@@ -177,7 +201,7 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     #tests.test_for_kitti_dataset(data_dir)
-    epochs = 10 # _10_, 20, 100
+    epochs = 20 # _10_, 20, 100
     #Maximum of 10. No bigger batch size possible on GTX 1060
     batch_size = 8 # 2, 4, 6, _8_, 10
 
